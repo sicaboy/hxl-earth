@@ -79,23 +79,27 @@ class SolarSystem {
     }
     
     createLights() {
-        // 太阳光源
-        const sunLight = new THREE.PointLight(0xffffff, 3, 2000);
+        // 太阳光源（增强光照强度和对比度）
+        const sunLight = new THREE.PointLight(0xffffff, 4, 2000);
         sunLight.position.set(0, 0, 0);
         sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 2048;
-        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.mapSize.width = 4096;
+        sunLight.shadow.mapSize.height = 4096;
         sunLight.shadow.camera.near = 0.1;
         sunLight.shadow.camera.far = 1000;
+        sunLight.shadow.bias = -0.0001;
         this.scene.add(sunLight);
         
-        // 环境光（增强亮度）
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+        // 环境光（降低强度以增加对比度）
+        const ambientLight = new THREE.AmbientLight(0x202040, 0.15);
         this.scene.add(ambientLight);
         
-        // 添加方向光补充照明
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-        directionalLight.position.set(10, 10, 5);
+        // 添加方向光补充照明（模拟反射光）
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        directionalLight.position.set(50, 50, 50);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
         this.scene.add(directionalLight);
     }
     
@@ -242,19 +246,26 @@ class SolarSystem {
         this.earthOrbit = new THREE.Group();
         this.scene.add(this.earthOrbit);
         
-        // 创建地球
-        const earthGeometry = new THREE.SphereGeometry(3, 32, 32);
+        // 创建地球（提高几何体质量）
+        const earthGeometry = new THREE.SphereGeometry(3, 64, 64);
         const earthMaterial = new THREE.MeshPhongMaterial({
             map: this.createEarthTexture(),
             bumpMap: this.createEarthBumpTexture(),
-            bumpScale: 0.1,
-            shininess: 1,
-            emissive: 0x001122,
-            emissiveIntensity: 0.1
+            bumpScale: 0.05,
+            normalMap: this.createEarthNormalTexture(),
+            normalScale: new THREE.Vector2(0.5, 0.5),
+            shininess: 5,
+            specular: 0x111111,
+            emissive: 0x000408,
+            emissiveIntensity: 0.08
         });
         
         this.earth = new THREE.Mesh(earthGeometry, earthMaterial);
         this.earth.position.set(60, 0, 0);
+        
+        // 添加地球的23.5度轴倾斜
+        this.earth.rotation.z = THREE.MathUtils.degToRad(23.5);
+        
         this.earth.castShadow = true;
         this.earth.receiveShadow = true;
         this.earthOrbit.add(this.earth);
@@ -268,38 +279,78 @@ class SolarSystem {
     
     createEarthTexture() {
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
+        canvas.width = 512;
+        canvas.height = 512;
         const context = canvas.getContext('2d');
         
-        // 创建地球表面（使用更亮的蓝色）
-        context.fillStyle = '#1a80ff';
-        context.fillRect(0, 0, 256, 256);
+        // 创建地球表面（深海蓝色）
+        context.fillStyle = '#0f4c75';
+        context.fillRect(0, 0, 512, 512);
         
-        // 添加大陆（使用更亮的绿色）
-        context.fillStyle = '#32cd32';
-        for (let i = 0; i < 20; i++) {
-            const x = Math.random() * 256;
-            const y = Math.random() * 256;
-            const width = Math.random() * 50 + 20;
-            const height = Math.random() * 30 + 15;
-            
+        // 添加更逼真的大陆形状
+        context.fillStyle = '#2d5016';
+        // 模拟大陆板块
+        const continents = [
+            { x: 80, y: 150, w: 120, h: 80 },   // 非洲
+            { x: 150, y: 100, w: 180, h: 100 }, // 亚洲
+            { x: 50, y: 200, w: 100, h: 120 },  // 南美洲
+            { x: 30, y: 80, w: 80, h: 100 },    // 北美洲
+            { x: 250, y: 300, w: 60, h: 40 },   // 澳洲
+            { x: 200, y: 350, w: 80, h: 30 }    // 南极洲
+        ];
+        
+        continents.forEach(continent => {
             context.beginPath();
-            context.ellipse(x, y, width, height, Math.random() * Math.PI, 0, Math.PI * 2);
+            context.ellipse(continent.x, continent.y, continent.w/2, continent.h/2, 
+                          Math.random() * Math.PI, 0, Math.PI * 2);
             context.fill();
-        }
+            
+            // 添加山脉细节
+            context.fillStyle = '#1a3d0a';
+            for (let i = 0; i < 5; i++) {
+                const mx = continent.x + (Math.random() - 0.5) * continent.w * 0.5;
+                const my = continent.y + (Math.random() - 0.5) * continent.h * 0.5;
+                context.beginPath();
+                context.arc(mx, my, Math.random() * 8 + 3, 0, Math.PI * 2);
+                context.fill();
+            }
+            context.fillStyle = '#2d5016';
+        });
         
-        // 添加云层（更明显的白色）
-        context.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        for (let i = 0; i < 30; i++) {
-            const x = Math.random() * 256;
-            const y = Math.random() * 256;
-            const radius = Math.random() * 15 + 5;
+        // 添加海洋深浅变化
+        context.fillStyle = 'rgba(15, 76, 117, 0.3)';
+        for (let i = 0; i < 50; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 512;
+            const radius = Math.random() * 20 + 5;
             
             context.beginPath();
             context.arc(x, y, radius, 0, Math.PI * 2);
             context.fill();
         }
+        
+        // 添加更逼真的云层
+        context.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        for (let i = 0; i < 60; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 512;
+            const radius = Math.random() * 25 + 8;
+            
+            context.beginPath();
+            context.arc(x, y, radius, 0, Math.PI * 2);
+            context.fill();
+        }
+        
+        // 添加极地冰盖
+        context.fillStyle = 'rgba(240, 248, 255, 0.8)';
+        // 北极
+        context.beginPath();
+        context.arc(256, 50, 40, 0, Math.PI * 2);
+        context.fill();
+        // 南极
+        context.beginPath();
+        context.arc(256, 462, 35, 0, Math.PI * 2);
+        context.fill();
         
         return new THREE.CanvasTexture(canvas);
     }
@@ -329,17 +380,57 @@ class SolarSystem {
         return new THREE.CanvasTexture(canvas);
     }
     
+    createEarthNormalTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const context = canvas.getContext('2d');
+        
+        context.fillStyle = '#888888';
+        context.fillRect(0, 0, 256, 256);
+        
+        // 添加地形高度信息
+        for (let i = 0; i < 100; i++) {
+            const x = Math.random() * 256;
+            const y = Math.random() * 256;
+            const radius = Math.random() * 10;
+            const brightness = Math.random() * 100 + 100;
+            
+            context.beginPath();
+            context.arc(x, y, radius, 0, Math.PI * 2);
+            context.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+            context.fill();
+        }
+        
+        return new THREE.CanvasTexture(canvas);
+    }
+    
     createAtmosphere() {
-        const atmosphereGeometry = new THREE.SphereGeometry(3.2, 32, 32);
+        // 创建主大气层
+        const atmosphereGeometry = new THREE.SphereGeometry(3.1, 32, 32);
         const atmosphereMaterial = new THREE.MeshBasicMaterial({
             color: 0x87ceeb,
             transparent: true,
-            opacity: 0.15,
-            side: THREE.BackSide
+            opacity: 0.2,
+            side: THREE.BackSide,
+            depthWrite: false
         });
         
         const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
         this.earth.add(atmosphere);
+        
+        // 创建外层大气辉光
+        const glowGeometry = new THREE.SphereGeometry(3.25, 32, 32);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x4da6ff,
+            transparent: true,
+            opacity: 0.08,
+            side: THREE.BackSide,
+            depthWrite: false
+        });
+        
+        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+        this.earth.add(glow);
     }
     
     createMoonSystem() {
@@ -347,15 +438,16 @@ class SolarSystem {
         this.moonOrbit = new THREE.Group();
         this.earth.add(this.moonOrbit);
         
-        // 创建月球
-        const moonGeometry = new THREE.SphereGeometry(1, 16, 16);
+        // 创建月球（提高几何体质量）
+        const moonGeometry = new THREE.SphereGeometry(1, 32, 32);
         const moonMaterial = new THREE.MeshPhongMaterial({
             map: this.createMoonTexture(),
             bumpMap: this.createMoonBumpTexture(),
-            bumpScale: 0.1,
+            bumpScale: 0.08,
             shininess: 1,
-            emissive: 0x111111,
-            emissiveIntensity: 0.1
+            specular: 0x222222,
+            emissive: 0x080808,
+            emissiveIntensity: 0.05
         });
         
         this.moon = new THREE.Mesh(moonGeometry, moonMaterial);
@@ -370,24 +462,78 @@ class SolarSystem {
     
     createMoonTexture() {
         const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
+        canvas.width = 256;
+        canvas.height = 256;
         const context = canvas.getContext('2d');
         
-        // 月球基色（更亮的灰色）
-        context.fillStyle = '#e6e6e6';
-        context.fillRect(0, 0, 128, 128);
+        // 月球基色（更逼真的月球色调）
+        context.fillStyle = '#c8c8c8';
+        context.fillRect(0, 0, 256, 256);
         
-        // 添加陨石坑（使用对比度更高的颜色）
-        for (let i = 0; i < 30; i++) {
-            const x = Math.random() * 128;
-            const y = Math.random() * 128;
-            const radius = Math.random() * 8 + 2;
+        // 添加月海（暗色区域）
+        context.fillStyle = '#a0a0a0';
+        const maria = [
+            { x: 60, y: 80, r: 25 },   // 静海
+            { x: 120, y: 60, r: 20 },  // 危海
+            { x: 180, y: 100, r: 30 }, // 风暴洋
+            { x: 80, y: 150, r: 18 },  // 雨海
+            { x: 150, y: 180, r: 22 }  // 澄海
+        ];
+        
+        maria.forEach(mare => {
+            context.beginPath();
+            context.arc(mare.x, mare.y, mare.r, 0, Math.PI * 2);
+            context.fill();
+        });
+        
+        // 添加大型陨石坑
+        context.fillStyle = '#909090';
+        const largeCraters = [
+            { x: 200, y: 50, r: 15 },
+            { x: 40, y: 200, r: 12 },
+            { x: 180, y: 200, r: 18 },
+            { x: 30, y: 60, r: 10 }
+        ];
+        
+        largeCraters.forEach(crater => {
+            context.beginPath();
+            context.arc(crater.x, crater.y, crater.r, 0, Math.PI * 2);
+            context.fill();
+            
+            // 添加撞击坑边缘
+            context.strokeStyle = '#b0b0b0';
+            context.lineWidth = 2;
+            context.stroke();
+        });
+        
+        // 添加小型陨石坑（增加密度）
+        for (let i = 0; i < 80; i++) {
+            const x = Math.random() * 256;
+            const y = Math.random() * 256;
+            const radius = Math.random() * 6 + 1;
             
             context.beginPath();
             context.arc(x, y, radius, 0, Math.PI * 2);
-            context.fillStyle = `rgba(180, 180, 180, ${Math.random() * 0.7 + 0.3})`;
+            context.fillStyle = `rgba(144, 144, 144, ${Math.random() * 0.6 + 0.4})`;
             context.fill();
+        }
+        
+        // 添加射纹（明亮的辐射纹）
+        context.strokeStyle = 'rgba(220, 220, 220, 0.3)';
+        context.lineWidth = 1;
+        for (let i = 0; i < 20; i++) {
+            const centerX = Math.random() * 256;
+            const centerY = Math.random() * 256;
+            const angle = Math.random() * Math.PI * 2;
+            const length = Math.random() * 50 + 20;
+            
+            context.beginPath();
+            context.moveTo(centerX, centerY);
+            context.lineTo(
+                centerX + Math.cos(angle) * length,
+                centerY + Math.sin(angle) * length
+            );
+            context.stroke();
         }
         
         return new THREE.CanvasTexture(canvas);
@@ -503,22 +649,34 @@ class SolarSystem {
             case 'space':
                 targetPosition = new THREE.Vector3(0, 50, 100);
                 targetLookAt = new THREE.Vector3(0, 0, 0);
+                this.controls.minDistance = 5;
+                this.controls.maxDistance = 500;
                 break;
             case 'earth':
                 const earthWorldPos = new THREE.Vector3();
                 this.earth.getWorldPosition(earthWorldPos);
-                targetPosition = earthWorldPos.clone().add(new THREE.Vector3(15, 5, 15));
-                targetLookAt = earthWorldPos;
+                // 确保相机距离足够，避免进入地球内部
+                const earthOffset = new THREE.Vector3(12, 6, 12);
+                targetPosition = earthWorldPos.clone().add(earthOffset);
+                targetLookAt = earthWorldPos.clone();
+                this.controls.minDistance = 8;
+                this.controls.maxDistance = 50;
                 break;
             case 'moon':
                 const moonWorldPos = new THREE.Vector3();
                 this.moon.getWorldPosition(moonWorldPos);
-                targetPosition = moonWorldPos.clone().add(new THREE.Vector3(5, 2, 5));
-                targetLookAt = moonWorldPos;
+                // 确保相机距离足够，避免进入月球内部
+                const moonOffset = new THREE.Vector3(4, 2, 4);
+                targetPosition = moonWorldPos.clone().add(moonOffset);
+                targetLookAt = moonWorldPos.clone();
+                this.controls.minDistance = 3;
+                this.controls.maxDistance = 20;
                 break;
             case 'sun':
-                targetPosition = new THREE.Vector3(25, 10, 25);
+                targetPosition = new THREE.Vector3(20, 8, 20);
                 targetLookAt = new THREE.Vector3(0, 0, 0);
+                this.controls.minDistance = 15;
+                this.controls.maxDistance = 100;
                 break;
         }
         
