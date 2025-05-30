@@ -1,12 +1,223 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+// 纹理管理器类
+class TextureManager {
+    constructor() {
+        this.loader = new THREE.TextureLoader();
+        this.fallbackTextures = {};
+        this.loadingProgress = {};
+    }
+    
+    // 更新加载进度显示
+    updateLoadingProgress(message) {
+        const progressElement = document.getElementById('loading-progress');
+        if (progressElement) {
+            progressElement.textContent = message;
+        }
+        console.log(message);
+    }
+    
+    // 异步加载纹理，失败时使用后备纹理
+    async loadTexture(url, fallbackGenerator, name = '') {
+        const displayName = name || url.split('/').pop();
+        this.updateLoadingProgress(`正在加载 ${displayName}...`);
+        
+        return new Promise((resolve) => {
+            this.loader.load(
+                url,
+                (texture) => {
+                    console.log(`Successfully loaded texture: ${url}`);
+                    this.updateLoadingProgress(`✓ ${displayName} 加载成功`);
+                    texture.wrapS = THREE.RepeatWrapping;
+                    texture.wrapT = THREE.RepeatWrapping;
+                    resolve(texture);
+                },
+                (progress) => {
+                    if (progress.total > 0) {
+                        const percent = Math.round((progress.loaded / progress.total) * 100);
+                        this.updateLoadingProgress(`加载 ${displayName}: ${percent}%`);
+                    }
+                },
+                (error) => {
+                    console.warn(`Failed to load texture ${url}, using fallback`, error);
+                    this.updateLoadingProgress(`⚠ ${displayName} 加载失败，使用备用纹理`);
+                    const fallbackTexture = fallbackGenerator();
+                    resolve(fallbackTexture);
+                }
+            );
+        });
+    }
+    
+    // 创建后备地球纹理
+    createFallbackEarthTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const context = canvas.getContext('2d');
+        
+        // 创建地球表面（深海蓝色）
+        context.fillStyle = '#0f4c75';
+        context.fillRect(0, 0, 512, 512);
+        
+        // 添加更逼真的大陆形状
+        context.fillStyle = '#2d5016';
+        // 模拟大陆板块
+        const continents = [
+            { x: 80, y: 150, w: 120, h: 80 },   // 非洲
+            { x: 150, y: 100, w: 180, h: 100 }, // 亚洲
+            { x: 50, y: 200, w: 100, h: 120 },  // 南美洲
+            { x: 30, y: 80, w: 80, h: 100 },    // 北美洲
+            { x: 250, y: 300, w: 60, h: 40 },   // 澳洲
+            { x: 200, y: 350, w: 80, h: 30 }    // 南极洲
+        ];
+        
+        continents.forEach(continent => {
+            context.beginPath();
+            context.ellipse(continent.x, continent.y, continent.w/2, continent.h/2, 
+                          Math.random() * Math.PI, 0, Math.PI * 2);
+            context.fill();
+            
+            // 添加山脉细节
+            context.fillStyle = '#1a3d0a';
+            for (let i = 0; i < 5; i++) {
+                const mx = continent.x + (Math.random() - 0.5) * continent.w * 0.5;
+                const my = continent.y + (Math.random() - 0.5) * continent.h * 0.5;
+                context.beginPath();
+                context.arc(mx, my, Math.random() * 8 + 3, 0, Math.PI * 2);
+                context.fill();
+            }
+            context.fillStyle = '#2d5016';
+        });
+        
+        // 添加海洋深浅变化
+        context.fillStyle = 'rgba(15, 76, 117, 0.3)';
+        for (let i = 0; i < 50; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 512;
+            const radius = Math.random() * 20 + 5;
+            
+            context.beginPath();
+            context.arc(x, y, radius, 0, Math.PI * 2);
+            context.fill();
+        }
+        
+        // 添加更逼真的云层
+        context.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        for (let i = 0; i < 60; i++) {
+            const x = Math.random() * 512;
+            const y = Math.random() * 512;
+            const radius = Math.random() * 25 + 8;
+            
+            context.beginPath();
+            context.arc(x, y, radius, 0, Math.PI * 2);
+            context.fill();
+        }
+        
+        // 添加极地冰盖
+        context.fillStyle = 'rgba(240, 248, 255, 0.8)';
+        // 北极
+        context.beginPath();
+        context.arc(256, 50, 40, 0, Math.PI * 2);
+        context.fill();
+        // 南极
+        context.beginPath();
+        context.arc(256, 462, 35, 0, Math.PI * 2);
+        context.fill();
+        
+        return new THREE.CanvasTexture(canvas);
+    }
+    
+    // 创建后备月球纹理
+    createFallbackMoonTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const context = canvas.getContext('2d');
+        
+        // 月球基色（更逼真的月球色调）
+        context.fillStyle = '#c8c8c8';
+        context.fillRect(0, 0, 256, 256);
+        
+        // 添加月海（暗色区域）
+        context.fillStyle = '#a0a0a0';
+        const maria = [
+            { x: 60, y: 80, r: 25 },   // 静海
+            { x: 120, y: 60, r: 20 },  // 危海
+            { x: 180, y: 100, r: 30 }, // 风暴洋
+            { x: 80, y: 150, r: 18 },  // 雨海
+            { x: 150, y: 180, r: 22 }  // 澄海
+        ];
+        
+        maria.forEach(mare => {
+            context.beginPath();
+            context.arc(mare.x, mare.y, mare.r, 0, Math.PI * 2);
+            context.fill();
+        });
+        
+        // 添加大型陨石坑
+        context.fillStyle = '#909090';
+        const largeCraters = [
+            { x: 200, y: 50, r: 15 },
+            { x: 40, y: 200, r: 12 },
+            { x: 180, y: 200, r: 18 },
+            { x: 30, y: 60, r: 10 }
+        ];
+        
+        largeCraters.forEach(crater => {
+            context.beginPath();
+            context.arc(crater.x, crater.y, crater.r, 0, Math.PI * 2);
+            context.fill();
+            
+            // 添加撞击坑边缘
+            context.strokeStyle = '#b0b0b0';
+            context.lineWidth = 2;
+            context.stroke();
+        });
+        
+        // 添加小型陨石坑（增加密度）
+        for (let i = 0; i < 80; i++) {
+            const x = Math.random() * 256;
+            const y = Math.random() * 256;
+            const radius = Math.random() * 6 + 1;
+            
+            context.beginPath();
+            context.arc(x, y, radius, 0, Math.PI * 2);
+            context.fillStyle = `rgba(144, 144, 144, ${Math.random() * 0.6 + 0.4})`;
+            context.fill();
+        }
+        
+        // 添加射纹（明亮的辐射纹）
+        context.strokeStyle = 'rgba(220, 220, 220, 0.3)';
+        context.lineWidth = 1;
+        for (let i = 0; i < 20; i++) {
+            const centerX = Math.random() * 256;
+            const centerY = Math.random() * 256;
+            const angle = Math.random() * Math.PI * 2;
+            const length = Math.random() * 50 + 20;
+            
+            context.beginPath();
+            context.moveTo(centerX, centerY);
+            context.lineTo(
+                centerX + Math.cos(angle) * length,
+                centerY + Math.sin(angle) * length
+            );
+            context.stroke();
+        }
+        
+        return new THREE.CanvasTexture(canvas);
+    }
+}
+
 class SolarSystem {
     constructor() {
         this.scene = null;
         this.camera = null;
         this.renderer = null;
         this.controls = null;
+        
+        // 纹理管理器
+        this.textureManager = new TextureManager();
         
         // 天体对象
         this.sun = null;
@@ -28,14 +239,23 @@ class SolarSystem {
         this.init();
     }
     
-    init() {
+    async init() {
+        this.textureManager.updateLoadingProgress('正在初始化场景...');
         this.createScene();
         this.createCamera();
         this.createRenderer();
         this.createControls();
         this.createLights();
+        
+        this.textureManager.updateLoadingProgress('正在创建星空背景...');
         this.createStarField();
-        this.createSolarSystem();
+        
+        // 异步创建太阳系
+        await this.createSolarSystem();
+        
+        // 完成加载
+        this.textureManager.updateLoadingProgress('✓ 太阳系加载完成！');
+        
         this.setupEventListeners();
         this.animate();
         
@@ -44,7 +264,7 @@ class SolarSystem {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('ui-controls').style.display = 'block';
             document.getElementById('info-panel').style.display = 'block';
-        }, 1000);
+        }, 1500);
     }
     
     createScene() {
@@ -171,21 +391,21 @@ class SolarSystem {
         return texture;
     }
     
-    createSolarSystem() {
+    async createSolarSystem() {
         // 创建太阳
-        this.createSun();
+        await this.createSun();
         
         // 创建地球轨道系统
-        this.createEarthSystem();
+        await this.createEarthSystem();
         
         // 创建月球轨道系统
-        this.createMoonSystem();
+        await this.createMoonSystem();
     }
     
-    createSun() {
+    async createSun() {
         const sunGeometry = new THREE.SphereGeometry(8, 32, 32);
         const sunMaterial = new THREE.MeshBasicMaterial({
-            map: this.createSunTexture(),
+            map: await this.createSunTexture(),
             emissive: 0xffaa00,
             emissiveIntensity: 0.3
         });
@@ -197,35 +417,42 @@ class SolarSystem {
         this.createSunGlow();
     }
     
-    createSunTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const context = canvas.getContext('2d');
-        
-        // 创建太阳表面纹理
-        const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
-        gradient.addColorStop(0, '#ffff00');
-        gradient.addColorStop(0.3, '#ff8800');
-        gradient.addColorStop(0.6, '#ff4400');
-        gradient.addColorStop(1, '#cc2200');
-        
-        context.fillStyle = gradient;
-        context.fillRect(0, 0, 256, 256);
-        
-        // 添加表面细节
-        for (let i = 0; i < 50; i++) {
-            const x = Math.random() * 256;
-            const y = Math.random() * 256;
-            const radius = Math.random() * 10 + 2;
-            
-            context.beginPath();
-            context.arc(x, y, radius, 0, Math.PI * 2);
-            context.fillStyle = `rgba(255, ${100 + Math.random() * 100}, 0, ${Math.random() * 0.5})`;
-            context.fill();
-        }
-        
-        return new THREE.CanvasTexture(canvas);
+    async createSunTexture() {
+        // 尝试加载真实的太阳纹理，失败时使用程序生成的纹理
+        return await this.textureManager.loadTexture(
+            './textures/sun_2k.jpg',
+            () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const context = canvas.getContext('2d');
+                
+                // 创建太阳表面纹理
+                const gradient = context.createRadialGradient(128, 128, 0, 128, 128, 128);
+                gradient.addColorStop(0, '#ffff00');
+                gradient.addColorStop(0.3, '#ff8800');
+                gradient.addColorStop(0.6, '#ff4400');
+                gradient.addColorStop(1, '#cc2200');
+                
+                context.fillStyle = gradient;
+                context.fillRect(0, 0, 256, 256);
+                
+                // 添加表面细节
+                for (let i = 0; i < 50; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const radius = Math.random() * 10 + 2;
+                    
+                    context.beginPath();
+                    context.arc(x, y, radius, 0, Math.PI * 2);
+                    context.fillStyle = `rgba(255, ${100 + Math.random() * 100}, 0, ${Math.random() * 0.5})`;
+                    context.fill();
+                }
+                
+                return new THREE.CanvasTexture(canvas);
+            },
+            'Sun Texture'
+        );
     }
     
     createSunGlow() {
@@ -241,7 +468,7 @@ class SolarSystem {
         this.sun.add(glow);
     }
     
-    createEarthSystem() {
+    async createEarthSystem() {
         // 创建地球轨道容器
         this.earthOrbit = new THREE.Group();
         this.scene.add(this.earthOrbit);
@@ -249,7 +476,7 @@ class SolarSystem {
         // 创建地球（提高几何体质量）
         const earthGeometry = new THREE.SphereGeometry(3, 64, 64);
         const earthMaterial = new THREE.MeshPhongMaterial({
-            map: this.createEarthTexture(),
+            map: await this.createEarthTexture(),
             bumpMap: this.createEarthBumpTexture(),
             bumpScale: 0.05,
             normalMap: this.createEarthNormalTexture(),
@@ -277,82 +504,32 @@ class SolarSystem {
         this.createOrbitLine(60, 0x4444ff);
     }
     
-    createEarthTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const context = canvas.getContext('2d');
-        
-        // 创建地球表面（深海蓝色）
-        context.fillStyle = '#0f4c75';
-        context.fillRect(0, 0, 512, 512);
-        
-        // 添加更逼真的大陆形状
-        context.fillStyle = '#2d5016';
-        // 模拟大陆板块
-        const continents = [
-            { x: 80, y: 150, w: 120, h: 80 },   // 非洲
-            { x: 150, y: 100, w: 180, h: 100 }, // 亚洲
-            { x: 50, y: 200, w: 100, h: 120 },  // 南美洲
-            { x: 30, y: 80, w: 80, h: 100 },    // 北美洲
-            { x: 250, y: 300, w: 60, h: 40 },   // 澳洲
-            { x: 200, y: 350, w: 80, h: 30 }    // 南极洲
+    async createEarthTexture() {
+        // 尝试加载本地和在线的地球纹理
+        const earthTextureUrls = [
+            // 本地高质量地球图像
+            './textures/earth_8k.jpg',
+            // 备用在线URL
+            'https://www.solarsystemscope.com/textures/download/2k_earth_daymap.jpg',
+            // NASA Blue Marble URL
+            'https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73909/world.topo.bathy.200412.3x5400x2700.jpg'
         ];
         
-        continents.forEach(continent => {
-            context.beginPath();
-            context.ellipse(continent.x, continent.y, continent.w/2, continent.h/2, 
-                          Math.random() * Math.PI, 0, Math.PI * 2);
-            context.fill();
-            
-            // 添加山脉细节
-            context.fillStyle = '#1a3d0a';
-            for (let i = 0; i < 5; i++) {
-                const mx = continent.x + (Math.random() - 0.5) * continent.w * 0.5;
-                const my = continent.y + (Math.random() - 0.5) * continent.h * 0.5;
-                context.beginPath();
-                context.arc(mx, my, Math.random() * 8 + 3, 0, Math.PI * 2);
-                context.fill();
+        // 尝试加载第一个URL，失败时尝试其他URL
+        for (const url of earthTextureUrls) {
+            try {
+                const texture = await this.textureManager.loadTexture(url, () => this.textureManager.createFallbackEarthTexture(), 'Earth Texture');
+                console.log(`Successfully loaded Earth texture from: ${url}`);
+                return texture;
+            } catch (error) {
+                console.warn(`Failed to load earth texture from ${url}:`, error);
+                continue;
             }
-            context.fillStyle = '#2d5016';
-        });
-        
-        // 添加海洋深浅变化
-        context.fillStyle = 'rgba(15, 76, 117, 0.3)';
-        for (let i = 0; i < 50; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const radius = Math.random() * 20 + 5;
-            
-            context.beginPath();
-            context.arc(x, y, radius, 0, Math.PI * 2);
-            context.fill();
         }
         
-        // 添加更逼真的云层
-        context.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        for (let i = 0; i < 60; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const radius = Math.random() * 25 + 8;
-            
-            context.beginPath();
-            context.arc(x, y, radius, 0, Math.PI * 2);
-            context.fill();
-        }
-        
-        // 添加极地冰盖
-        context.fillStyle = 'rgba(240, 248, 255, 0.8)';
-        // 北极
-        context.beginPath();
-        context.arc(256, 50, 40, 0, Math.PI * 2);
-        context.fill();
-        // 南极
-        context.beginPath();
-        context.arc(256, 462, 35, 0, Math.PI * 2);
-        context.fill();
-        
-        return new THREE.CanvasTexture(canvas);
+        // 如果所有URL都失败，使用后备纹理
+        console.warn('All earth texture URLs failed, using fallback texture');
+        return this.textureManager.createFallbackEarthTexture();
     }
     
     createEarthBumpTexture() {
@@ -433,7 +610,7 @@ class SolarSystem {
         this.earth.add(glow);
     }
     
-    createMoonSystem() {
+    async createMoonSystem() {
         // 创建月球轨道容器（相对于地球）
         this.moonOrbit = new THREE.Group();
         this.earth.add(this.moonOrbit);
@@ -441,7 +618,7 @@ class SolarSystem {
         // 创建月球（提高几何体质量）
         const moonGeometry = new THREE.SphereGeometry(1, 32, 32);
         const moonMaterial = new THREE.MeshPhongMaterial({
-            map: this.createMoonTexture(),
+            map: await this.createMoonTexture(),
             bumpMap: this.createMoonBumpTexture(),
             bumpScale: 0.08,
             shininess: 1,
@@ -460,83 +637,31 @@ class SolarSystem {
         this.createMoonOrbitLine();
     }
     
-    createMoonTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const context = canvas.getContext('2d');
-        
-        // 月球基色（更逼真的月球色调）
-        context.fillStyle = '#c8c8c8';
-        context.fillRect(0, 0, 256, 256);
-        
-        // 添加月海（暗色区域）
-        context.fillStyle = '#a0a0a0';
-        const maria = [
-            { x: 60, y: 80, r: 25 },   // 静海
-            { x: 120, y: 60, r: 20 },  // 危海
-            { x: 180, y: 100, r: 30 }, // 风暴洋
-            { x: 80, y: 150, r: 18 },  // 雨海
-            { x: 150, y: 180, r: 22 }  // 澄海
+    async createMoonTexture() {
+        // 尝试加载本地和在线的月球纹理
+        const moonTextureUrls = [
+            // 本地高质量月球图像
+            './textures/moon_4k.jpg',
+            // 备用在线URL
+            'https://www.solarsystemscope.com/textures/download/2k_moon.jpg',
+            // NASA LRO 月球图像
+            'https://nasa3d.arc.nasa.gov/shared_assets/images/lis/moon/lro_color_poles_4k.jpg'
         ];
         
-        maria.forEach(mare => {
-            context.beginPath();
-            context.arc(mare.x, mare.y, mare.r, 0, Math.PI * 2);
-            context.fill();
-        });
-        
-        // 添加大型陨石坑
-        context.fillStyle = '#909090';
-        const largeCraters = [
-            { x: 200, y: 50, r: 15 },
-            { x: 40, y: 200, r: 12 },
-            { x: 180, y: 200, r: 18 },
-            { x: 30, y: 60, r: 10 }
-        ];
-        
-        largeCraters.forEach(crater => {
-            context.beginPath();
-            context.arc(crater.x, crater.y, crater.r, 0, Math.PI * 2);
-            context.fill();
-            
-            // 添加撞击坑边缘
-            context.strokeStyle = '#b0b0b0';
-            context.lineWidth = 2;
-            context.stroke();
-        });
-        
-        // 添加小型陨石坑（增加密度）
-        for (let i = 0; i < 80; i++) {
-            const x = Math.random() * 256;
-            const y = Math.random() * 256;
-            const radius = Math.random() * 6 + 1;
-            
-            context.beginPath();
-            context.arc(x, y, radius, 0, Math.PI * 2);
-            context.fillStyle = `rgba(144, 144, 144, ${Math.random() * 0.6 + 0.4})`;
-            context.fill();
+        for (const url of moonTextureUrls) {
+            try {
+                const texture = await this.textureManager.loadTexture(url, () => this.textureManager.createFallbackMoonTexture(), 'Moon Texture');
+                console.log(`Successfully loaded Moon texture from: ${url}`);
+                return texture;
+            } catch (error) {
+                console.warn(`Failed to load moon texture from ${url}:`, error);
+                continue;
+            }
         }
         
-        // 添加射纹（明亮的辐射纹）
-        context.strokeStyle = 'rgba(220, 220, 220, 0.3)';
-        context.lineWidth = 1;
-        for (let i = 0; i < 20; i++) {
-            const centerX = Math.random() * 256;
-            const centerY = Math.random() * 256;
-            const angle = Math.random() * Math.PI * 2;
-            const length = Math.random() * 50 + 20;
-            
-            context.beginPath();
-            context.moveTo(centerX, centerY);
-            context.lineTo(
-                centerX + Math.cos(angle) * length,
-                centerY + Math.sin(angle) * length
-            );
-            context.stroke();
-        }
-        
-        return new THREE.CanvasTexture(canvas);
+        // 如果所有URL都失败，使用后备纹理
+        console.warn('All moon texture URLs failed, using fallback texture');
+        return this.textureManager.createFallbackMoonTexture();
     }
     
     createMoonBumpTexture() {
