@@ -272,12 +272,12 @@ class SolarSystem {
         canvas.height = 256;
         const context = canvas.getContext('2d');
         
-        // 创建地球表面
-        context.fillStyle = '#0066cc';
+        // 创建地球表面（使用更亮的蓝色）
+        context.fillStyle = '#1a80ff';
         context.fillRect(0, 0, 256, 256);
         
-        // 添加大陆
-        context.fillStyle = '#228B22';
+        // 添加大陆（使用更亮的绿色）
+        context.fillStyle = '#32cd32';
         for (let i = 0; i < 20; i++) {
             const x = Math.random() * 256;
             const y = Math.random() * 256;
@@ -289,8 +289,8 @@ class SolarSystem {
             context.fill();
         }
         
-        // 添加云层
-        context.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        // 添加云层（更明显的白色）
+        context.fillStyle = 'rgba(255, 255, 255, 0.6)';
         for (let i = 0; i < 30; i++) {
             const x = Math.random() * 256;
             const y = Math.random() * 256;
@@ -352,7 +352,10 @@ class SolarSystem {
         const moonMaterial = new THREE.MeshPhongMaterial({
             map: this.createMoonTexture(),
             bumpMap: this.createMoonBumpTexture(),
-            bumpScale: 0.1
+            bumpScale: 0.1,
+            shininess: 1,
+            emissive: 0x111111,
+            emissiveIntensity: 0.1
         });
         
         this.moon = new THREE.Mesh(moonGeometry, moonMaterial);
@@ -371,11 +374,11 @@ class SolarSystem {
         canvas.height = 128;
         const context = canvas.getContext('2d');
         
-        // 月球基色
-        context.fillStyle = '#cccccc';
+        // 月球基色（更亮的灰色）
+        context.fillStyle = '#e6e6e6';
         context.fillRect(0, 0, 128, 128);
         
-        // 添加陨石坑
+        // 添加陨石坑（使用对比度更高的颜色）
         for (let i = 0; i < 30; i++) {
             const x = Math.random() * 128;
             const y = Math.random() * 128;
@@ -383,7 +386,7 @@ class SolarSystem {
             
             context.beginPath();
             context.arc(x, y, radius, 0, Math.PI * 2);
-            context.fillStyle = `rgba(150, 150, 150, ${Math.random() * 0.5 + 0.3})`;
+            context.fillStyle = `rgba(180, 180, 180, ${Math.random() * 0.7 + 0.3})`;
             context.fill();
         }
         
